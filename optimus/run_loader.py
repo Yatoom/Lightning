@@ -106,6 +106,24 @@ class RunLoader:
         return pd.DataFrame(all, columns=columns)
 
     @staticmethod
+    def load_meta_features(groups=None):
+
+        if groups is None:
+            _, groups = RunLoader.get_cc18_benchmarking_suite()
+
+        all_qualities = []
+
+        for dataset_id in tqdm(groups):
+            url = f"http://openml.org/api/v1/json/data/qualities/{dataset_id}"
+            data = requests.get(url).json()
+            qualities = data['data_qualities']['quality']
+            converted_qualities = {i['name']: i['value'] for i in qualities if
+                                   not (isinstance(i['value'], list) or np.isnan(float(i['value'])))}
+            all_qualities.append(converted_qualities)
+
+        return pd.DataFrame(all_qualities, index=groups)
+
+    @staticmethod
     def convert_param_name(param_name):
         """
         Examples:
@@ -127,11 +145,19 @@ class RunLoader:
 
     @staticmethod
     def get_cc18_benchmarking_suite():
-        return [146825, 146800, 146822, 146824, 167119, 146817, 14954, 37, 219, 9964, 3573, 12, 9957, 14970, 9946, 31,
-                3021, 146195, 18, 29, 11, 53, 6, 23, 2079, 14969, 3918, 3902, 9976, 15, 16, 32, 125922, 167120, 167121,
-                167124, 167125, 146819, 167141, 9910, 14952, 146818, 167140, 146820, 9952, 3904, 14, 49, 2074, 3022,
-                3481, 43, 3903, 9971, 3, 28, 9978, 7592, 3549, 22, 9985, 9960, 3913, 9977, 3560, 10101, 45, 10093,
-                146821, 3917, 9981, 125920, 14965]
+        tasks = [146825, 146800, 146822, 146824, 167119, 146817, 14954, 37, 219, 9964, 3573, 12, 9957, 14970, 9946, 31,
+                 3021, 146195, 18, 29, 11, 53, 6, 23, 2079, 14969, 3918, 3902, 9976, 15, 16, 32, 125922, 167120, 167121,
+                 167124, 167125, 146819, 167141, 9910, 14952, 146818, 167140, 146820, 9952, 3904, 14, 49, 2074, 3022,
+                 3481, 43, 3903, 9971, 3, 28, 9978, 7592, 3549, 22, 9985, 9960, 3913, 9977, 3560, 10101, 45, 10093,
+                 146821, 3917, 9981, 125920, 14965]
+
+        datasets = [11, 12, 14, 15, 16, 18, 54, 3, 6, 32, 37, 38, 44, 46, 50, 28, 29, 22, 23, 182, 188, 300, 307, 458,
+                    469, 554, 1049, 1050, 1067, 1068, 1053, 1590, 1485, 1486, 1487, 1475, 1478, 1480, 1461, 1462, 1468,
+                    1501, 1510, 1494, 1497, 4534, 4538, 6332, 23381, 23517, 40994, 40996, 41027, 40668, 40670, 40701,
+                    1489, 40923, 40927, 40975, 40978, 40979, 40981, 40982, 40983, 40984, 40966, 40499, 4134, 1063, 1464,
+                    31, 151]
+
+        return tasks, datasets
 
     @staticmethod
     def convert_runs_to_features(frame, metric="predictive_accuracy"):
