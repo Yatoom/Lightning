@@ -2,8 +2,7 @@ import json
 import os
 import openml
 from lightgbm import LGBMRegressor
-from sklearn.feature_selection import VarianceThreshold
-
+import numpy as np
 from optimus.run_loader import RunLoader
 import pandas as pd
 from arbok.param_preprocessor import ParamPreprocessor
@@ -19,7 +18,10 @@ class MetaLearner:
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
 
-    def download_flow(self, flow_id, tasks=None, metric="predictive_accuracy", max_per_task=5000):
+    def download_runs(self, flow_id, tasks=None, metric=None, max_per_task=5000):
+        if metric is None:
+            metric = self.metric
+
         file = os.path.join(self.cache_dir, f"runs-{flow_id}.csv")
 
         if os.path.exists(file):
@@ -33,32 +35,8 @@ class MetaLearner:
         frame.to_csv(file)
         return frame
 
-    def convert(self, frame, metric="predictive_accuracy"):
-        copied = frame.copy()
-        datasets = copied.pop("data_id")
-        tasks = copied.pop("task_id")
-        runs = copied.pop("run_id")
-        y = copied.pop(metric)
+    def convert_runs_to_features(self, frame, metric=None):
+        if metric is None:
+            metric = self.metric
+        return RunLoader.convert_runs_to_features(frame, metric)
 
-        # Drop columns we can not use
-        num_unique = copied.nunique()
-        for c in copied.columns:
-            if (copied.dtypes[c] == object and MetaLearner.is_json(copied[c][0])) or num_unique[c] <= 1:
-                print("Deleted", c)
-                del copied[c]
-
-        X = pd.get_dummies(copied)
-        return X, y, datasets
-
-    @staticmethod
-    def is_json(myjson):
-        try:
-            json_object = json.loads(myjson)
-        except ValueError as e:
-            return False
-        return True
-
-ml = MetaLearner()
-frame = ml.download_flow(6969)
-X, y, groups = ml.convert(frame)
-print()
