@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from arbok.param_preprocessor import ParamPreprocessor
 from lightgbm import LGBMRegressor, plot_importance
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from optimus.run_loader import RunLoader
 
@@ -19,11 +20,44 @@ class MetaLearner:
         self.model = LGBMRegressor(n_estimators=500, num_leaves=16, learning_rate=0.05, min_child_samples=1, verbose=-1)
         self.preprocessor = ParamPreprocessor()
 
+        self.X_hp = None
+        self.X_runs = None
+        self.X = None
+        self.y = None
+        self.groups = None
+        self.meta_features = None
+        self.runs = None
+
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
 
-    def train(self, X, y):
-        self.model.fit(X, y)
+    def train(self, X=None, y=None, groups=None):
+        X = self.X if X is None else X
+        y = self.y if y is None else y
+        groups = self.groups if groups is None else groups
+        unique_groups = np.unique(groups)
+
+        y_ = np.zeros_like(y)
+        for g in unique_groups:
+            indices = np.where(g == groups)[0]
+            selection = np.array(y[indices])
+            y_[indices] = StandardScaler().fit_transform(X=selection.reshape(-1, 1)).reshape(-1)
+
+        self.model.fit(X, y_)
+
+    def suggest_triple(self, mf):
+        # We should keep the indices, so we can lookup the originals
+        X_hp_ = self.X_hp.drop_duplicates()
+        mfs = pd.DataFrame(np.repeat(mf.to_dict(), len(X_hp_)).tolist())
+        X_ = pd.concat([X_hp_, mfs], axis=1)
+        pred = MinMaxScaler().fit_transform(self.model.predict(X_).reshape(-1, 1)).reshape(-1)
+        triple = [np.argmax((1 - pred) ** delta + pred) for delta in [0, 0.10, 0.20]]
+        if triple[0] == triple[1]:
+            print("Could not suggest useful features")
+            triple = np.random.choice(self.X_runs, 3)
+        else:
+            triple = self.X_runs.iloc[triple].to_dict(orient="records")
+        return triple
 
     def plot_importance(self, **kwargs):
         plot_importance(self.model, **kwargs)
@@ -79,7 +113,9 @@ class MetaLearner:
         # Load from cache if it exists
         if os.path.exists(file):
             with open(file, "r+") as f:
-                return pd.read_csv(f, index_col=0)
+                frame = pd.read_csv(f, index_col=0)
+                self.runs = frame
+                return frame
 
         # Set tasks
         if tasks is None:
@@ -88,12 +124,20 @@ class MetaLearner:
         # Load run-evaluations and save to cache
         frame = RunLoader.load_tasks(tasks, flow_id, metric=metric, max_per_task=max_per_task)
         frame.to_csv(file)
+
+        self.runs = frame
         return frame
 
-    def convert_runs_to_features(self, frame, metric=None):
+    def convert_runs_to_features(self, frame=None, metric=None):
+        frame = self.runs if frame is None else frame
         if metric is None:
             metric = self.metric
-        return RunLoader.convert_runs_to_features(frame, metric)
+        X, X_conv, y, groups = RunLoader.convert_runs_to_features(frame, metric)
+        self.X_runs = X
+        self.X_hp = X_conv
+        self.y = y
+        self.groups = groups
+        return X, X_conv, y, groups
 
     def download_meta_features(self, datasets=None):
 
@@ -109,7 +153,9 @@ class MetaLearner:
         # Load file from cache
         if os.path.exists(file):
             with open(file, "r+") as f:
-                return pd.read_csv(f, index_col=0)
+                frame = pd.read_csv(f, index_col=0)
+                self.meta_features = frame
+                return frame
 
         # Download qualities
         frame = RunLoader.load_meta_features(datasets)
@@ -117,14 +163,42 @@ class MetaLearner:
         # Write to file
         frame.to_csv(file)
 
+        self.meta_features = frame
         return frame
+
+    def combine_features(self, X=None, groups=None, meta_features=None, save=True):
+        X = self.X_hp if X is None else X
+        groups = self.groups if groups is None else groups
+        meta_features = self.meta_features if meta_features is None else meta_features
+
+        mf = meta_features.T.to_dict()
+        metas = pd.DataFrame([mf[g] for g in groups])
+        combined = pd.concat([X, metas], axis=1)
+
+        if save:
+            self.X = combined
+        return combined
 
 
 ml = MetaLearner()
-meta_features = ml.download_meta_features()
-runs = ml.download_runs(6969)
-X, y, groups = ml.convert_runs_to_features(runs)
-ml.train(X, y)
-ml.plot_importance()
-ml.std_over_group_means(X, groups)
-ml.plot_correlation(X, y)
+ml.download_runs(6969)
+ml.convert_runs_to_features()
+ml.download_meta_features()
+ml.combine_features()
+ml.train()
+triple = ml.suggest_triple(mf=ml.meta_features.loc[31])
+for i in triple:
+    print(i)
+
+
+
+# ml = MetaLearner()
+# meta_features = ml.download_meta_features()
+# runs = ml.download_runs(6969)
+# X, y, groups = ml.convert_runs_to_features(runs)
+# frame = ml.combine_features(X, groups, meta_features)
+# print()
+# ml.train(X, y)
+# ml.plot_importance()
+# ml.std_over_group_means(X, groups)
+# ml.plot_correlation(X, y)

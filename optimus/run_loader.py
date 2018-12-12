@@ -171,11 +171,18 @@ class RunLoader:
             _ = copied.pop("run_id")
 
         y = copied.pop(metric)
+        X = copied.copy()
 
         # Drop columns we can not use
         num_unique = copied.nunique()
         for c in copied.columns:
-            if copied.dtypes[c] == object and RunLoader.is_json(copied[c][0]):
+            if any(i in c for i in [
+                "random_state", "n_jobs", "verbose", "warm_start", "categorical_features", "dtype", "sparse"
+            ]):
+                del copied[c]
+                del X[c]
+                print("Removed", c, "(inactive parameter)")
+            elif copied.dtypes[c] == object and RunLoader.is_json(copied[c][0]):
                 if RunLoader.is_number(copied[c][0]):
                     is_number = np.array([RunLoader.is_number(i) for i in copied[c]])
                     numeric = np.where(is_number)[0]
@@ -189,6 +196,10 @@ class RunLoader:
                     copied[c + "__num"] = copied[c + "__num"].astype(float)
                     del copied[c]
                     print("Divided", c)
+
+                    # Also do something for X (so numeric values are not treated as strings)
+                    num_values[nominal] = nom_values[nominal]
+                    X[c] = num_values
                 else:
                     print("Removed", c, "(object)")
                     del copied[c]
@@ -196,8 +207,8 @@ class RunLoader:
                 print("Removed", c, "(1 unique value)")
                 del copied[c]
 
-        X = pd.get_dummies(copied)
-        return X, y, datasets
+        X_conv = pd.get_dummies(copied).astype(float)
+        return X, X_conv, y, datasets
 
     @staticmethod
     def is_json(s):
