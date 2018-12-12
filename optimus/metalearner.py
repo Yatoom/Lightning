@@ -178,27 +178,3 @@ class MetaLearner:
         if save:
             self.X = combined
         return combined
-
-
-ml = MetaLearner()
-ml.download_runs(6969)
-ml.convert_runs_to_features()
-ml.download_meta_features()
-ml.combine_features()
-ml.train()
-triple = ml.suggest_triple(mf=ml.meta_features.loc[31])
-for i in triple:
-    print(i)
-
-
-
-# ml = MetaLearner()
-# meta_features = ml.download_meta_features()
-# runs = ml.download_runs(6969)
-# X, y, groups = ml.convert_runs_to_features(runs)
-# frame = ml.combine_features(X, groups, meta_features)
-# print()
-# ml.train(X, y)
-# ml.plot_importance()
-# ml.std_over_group_means(X, groups)
-# ml.plot_correlation(X, y)

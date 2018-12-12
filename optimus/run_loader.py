@@ -173,11 +173,20 @@ class RunLoader:
         y = copied.pop(metric)
         X = copied.copy()
 
+        renames = {
+            "decisiontreeclassifier__min_impurity_split": "decisiontreeclassifier__min_impurity_decrease",
+            "randomforestclassifier__min_impurity_split": "randomforestclassifier__min_impurity_decrease",
+            "onehotencoder__n_values": "onehotencoder__categories"
+        }
+        copied = copied.rename(renames)
+        X = X.rename(renames)
+
         # Drop columns we can not use
         num_unique = copied.nunique()
         for c in copied.columns:
             if any(i in c for i in [
-                "random_state", "n_jobs", "verbose", "warm_start", "categorical_features", "dtype", "sparse"
+                "random_state", "n_jobs", "verbose", "warm_start", "categorical_features", "dtype", "sparse",
+                "missing_values"
             ]):
                 del copied[c]
                 del X[c]
