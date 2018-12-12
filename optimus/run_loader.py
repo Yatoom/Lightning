@@ -178,15 +178,15 @@ class RunLoader:
             "randomforestclassifier__min_impurity_split": "randomforestclassifier__min_impurity_decrease",
             "onehotencoder__n_values": "onehotencoder__categories"
         }
-        copied = copied.rename(renames)
-        X = X.rename(renames)
+        copied = copied.rename(renames, axis=1)
+        X = X.rename(renames, axis=1)
 
         # Drop columns we can not use
-        num_unique = copied.nunique()
+        # num_unique = copied.nunique()
         for c in copied.columns:
             if any(i in c for i in [
                 "random_state", "n_jobs", "verbose", "warm_start", "categorical_features", "dtype", "sparse",
-                "missing_values"
+                "missing_values", "class_weight"
             ]):
                 del copied[c]
                 del X[c]
@@ -212,7 +212,7 @@ class RunLoader:
                 else:
                     print("Removed", c, "(object)")
                     del copied[c]
-            elif num_unique[c] <= 1:
+            elif copied[c].nunique() <= 1:
                 print("Removed", c, "(1 unique value)")
                 del copied[c]
 

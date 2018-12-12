@@ -41,6 +41,7 @@ class Optimizer:
             print(f"{score}/{np.max(self.observed_y)}")
 
     def observe(self, params):
+        params = {i: None if isinstance(j, np.float) and np.isnan(j) else j for i, j in params.items()}
         pipeline = clone(self.pipeline).set_params(**params)
         scores = cross_val_score(estimator=pipeline, X=self.X, y=self.y, cv=self.cv, scoring=self.metric)
         score = np.mean(scores)

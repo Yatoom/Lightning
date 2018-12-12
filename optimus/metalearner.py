@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.stats
 from arbok.param_preprocessor import ParamPreprocessor
 from lightgbm import LGBMRegressor, plot_importance
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -58,6 +59,26 @@ class MetaLearner:
         else:
             triple = self.X_runs.iloc[triple].to_dict(orient="records")
         return triple
+
+    def suggest_grid(self):
+        grid = {}
+        for c in self.X_runs.columns:
+            unique_values = self.X_runs[c].unique()
+
+            if len(unique_values) > 30:
+                selection = [RunLoader.is_number(s) for s in unique_values]
+                unique_values = np.array(unique_values)[selection]
+                min = np.min(unique_values)
+                scale = np.min(unique_values) - min
+                grid[c] = scipy.stats.uniform(min, scale)
+            else:
+                try:
+                    unique_values_ = np.sort(unique_values)
+                except TypeError:
+                    unique_values_ = unique_values
+                unique_values = unique_values_
+                grid[c] = unique_values
+        return grid
 
     def plot_importance(self, **kwargs):
         plot_importance(self.model, **kwargs)
