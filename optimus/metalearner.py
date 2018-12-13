@@ -68,8 +68,9 @@ class MetaLearner:
             if len(unique_values) > 30:
                 selection = [RunLoader.is_number(s) for s in unique_values]
                 unique_values = np.array(unique_values)[selection]
-                min = np.min(unique_values)
-                scale = np.min(unique_values) - min
+                min = np.round(np.min(unique_values))
+                scale = np.round(np.max(unique_values) - min)
+                scale = np.maximum(scale + 1 - scale, scale)
                 grid[c] = scipy.stats.uniform(min, scale)
             else:
                 try:
