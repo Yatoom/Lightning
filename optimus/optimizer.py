@@ -1,4 +1,5 @@
 import hashlib
+import time
 
 from lightgbm import LGBMRegressor
 from sklearn import clone
@@ -38,7 +39,7 @@ class Optimizer:
         for n in range(n_iter):
             sample = self.suggest()
             score = self.observe(sample)
-            print(f"{score}/{np.max(self.observed_y)}")
+            print(f"{score:.6}/{np.max(self.observed_y):.6} {sample}")
 
     def observe(self, params):
         params = {i: None if isinstance(j, np.float) and np.isnan(j) else j for i, j in params.items()}
@@ -53,20 +54,32 @@ class Optimizer:
     def clean(self, X):
         return pd.get_dummies(X).astype(float)
 
+    def sample_random(self, amount=1000000):
+        values = {}
+        for c, v in self.grid.items():
+            if hasattr(v, "rvs"):
+                values[c] = v.rvs(amount)
+            else:
+                indices = np.random.randint(len(v), size=amount)
+                values[c] = np.array(v)[indices]
+        converted = pd.DataFrame(values)
+        return converted
+
+
     def suggest(self):
-        samples = ParameterSampler(self.grid, 500)
-        samples = list(samples)
-        samples = np.array(samples)
+        # samples = ParameterSampler(self.grid, 50000)  # Takes 3.5-4 seconds
+        samples = self.sample_random()
+        # samples = list(samples)
 
         # Remove already observed
-        hashes = [hashlib.md5(str.encode(str(i))).hexdigest()[:8] for i in samples]
-        for hash in self.observed_hashes:
-            selection = np.array(hashes) != np.array(hash)
-            hashes = np.array(hashes)[selection]
-            samples = samples[selection]
+        # hashes = [hashlib.md5(str.encode(str(i))).hexdigest()[:8] for i in samples]  # Takes 0.6 seconds
+        # for hash in self.observed_hashes:
+        #     selection = np.array(hashes) != np.array(hash)
+        #     hashes = np.array(hashes)[selection]
+        #     samples = samples[selection]
 
         # Clean samples and observed samples together
-        frame = pd.concat([pd.DataFrame(self.observed_X), pd.DataFrame(samples.tolist())], sort=True)
+        frame = pd.concat([pd.DataFrame(self.observed_X), samples], sort=True)
         frame = self.clean(frame)
 
         # Extract
@@ -78,4 +91,4 @@ class Optimizer:
         self.model.fit(X_, self.observed_y)
         predicted = self.model.predict(samples_)
 
-        return samples[np.argmax(predicted)]
+        return samples.iloc[np.argmax(predicted)].to_dict()
