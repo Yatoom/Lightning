@@ -1,20 +1,23 @@
 import hashlib
-import time
+import pdb
 
+import numpy as np
+import pandas as pd
 from lightgbm import LGBMRegressor
 from sklearn import clone
-from sklearn.model_selection import cross_val_score, ParameterSampler
-import pandas as pd
-import numpy as np
+from sklearn.model_selection import cross_val_score
 from tqdm import tqdm
 
 
 class Optimizer:
     def __init__(self, pipeline):
-        self.model = LGBMRegressor(num_leaves=8, min_child_samples=1, min_data_in_bin=1, verbose=-1, objective="quantile")
+        self.model = LGBMRegressor(
+            num_leaves=8, min_child_samples=1, min_data_in_bin=1, verbose=-1, objective="quantile",
+            alpha=0.85
+        )
         self.observed_X = []
         self.observed_y = []
-        self.observed_hashes = []
+        self.observed_hashes = set()
         self.pipeline = pipeline
         self.X = None
         self.y = None
@@ -42,19 +45,25 @@ class Optimizer:
             print(f"{score:.6}/{np.max(self.observed_y):.6} {sample}")
 
     def observe(self, params):
+        params = {i: np.nan if j is None else j for i, j in params.items()}
+        hash = hashlib.md5(str(pd.Series(params).values).encode()).hexdigest()[:8]
         params = {i: None if isinstance(j, np.float) and np.isnan(j) else j for i, j in params.items()}
+
         pipeline = clone(self.pipeline).set_params(**params)
         scores = cross_val_score(estimator=pipeline, X=self.X, y=self.y, cv=self.cv, scoring=self.metric)
         score = np.mean(scores)
         self.observed_X.append(params)
         self.observed_y.append(score)
-        self.observed_hashes.append(hashlib.md5(str(params).encode()).hexdigest()[:8])
+
+        assert(hash not in self.observed_hashes)
+        self.observed_hashes.add(hash)
+
         return score
 
     def clean(self, X):
         return pd.get_dummies(X).astype(float)
 
-    def sample_random(self, amount=1000000):
+    def sample_random(self, amount=1000):
         values = {}
         for c, v in self.grid.items():
             if hasattr(v, "rvs"):
@@ -65,18 +74,20 @@ class Optimizer:
         converted = pd.DataFrame(values)
         return converted
 
-
     def suggest(self):
-        # samples = ParameterSampler(self.grid, 50000)  # Takes 3.5-4 seconds
+
+        # Some quick checks
+        assert(len(self.observed_y) == len(self.observed_X))
+        assert(len(self.observed_X) == len(self.observed_hashes))
+
+        # Get random samples
         samples = self.sample_random()
-        # samples = list(samples)
 
         # Remove already observed
-        # hashes = [hashlib.md5(str.encode(str(i))).hexdigest()[:8] for i in samples]  # Takes 0.6 seconds
-        # for hash in self.observed_hashes:
-        #     selection = np.array(hashes) != np.array(hash)
-        #     hashes = np.array(hashes)[selection]
-        #     samples = samples[selection]
+        hashes = [hashlib.md5(str(i).encode()).hexdigest()[:8] for i in samples.values]
+        selection = [hash not in self.observed_hashes for hash in hashes]
+        samples = samples[selection]
+        print("Deleted", np.sum(selection))
 
         # Clean samples and observed samples together
         frame = pd.concat([pd.DataFrame(self.observed_X), samples], sort=True)
@@ -91,4 +102,7 @@ class Optimizer:
         self.model.fit(X_, self.observed_y)
         predicted = self.model.predict(samples_)
 
-        return samples.iloc[np.argmax(predicted)].to_dict()
+        # Get suggested and save hash
+        suggested = samples.iloc[np.argmax(predicted)]
+
+        return suggested.to_dict()
