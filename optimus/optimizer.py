@@ -39,16 +39,26 @@ class Optimizer:
             self.observe(config)
 
     def loop(self, n_iter=150):
-        for n in range(n_iter):
+        best_sample = None
+        best_score = 0
+        for n in tqdm(range(n_iter)):
             sample = self.suggest()
             score = self.observe(sample)
-            print(f"{score:.6}/{np.max(self.observed_y):.6} {sample}")
+            if score > best_score:
+                best_sample = sample
+            print(f"{score:.6}/{np.max(self.observed_y):.6}")
+        return best_sample
 
     def observe(self, params):
+
+        # Create hash (using np.nan's instead of None's)
         params = {i: np.nan if j is None else j for i, j in params.items()}
         hash = hashlib.md5(str(pd.Series(params).values).encode()).hexdigest()[:8]
+
+        # Convert params (using None's instead of np.nan's)
         params = {i: None if isinstance(j, np.float) and np.isnan(j) else j for i, j in params.items()}
 
+        # Setup pipeline
         pipeline = clone(self.pipeline).set_params(**params)
         scores = cross_val_score(estimator=pipeline, X=self.X, y=self.y, cv=self.cv, scoring=self.metric)
         score = np.mean(scores)
@@ -63,7 +73,7 @@ class Optimizer:
     def clean(self, X):
         return pd.get_dummies(X).astype(float)
 
-    def sample_random(self, amount=1000):
+    def sample_random(self, amount=500):
         values = {}
         for c, v in self.grid.items():
             if hasattr(v, "rvs"):
@@ -87,7 +97,6 @@ class Optimizer:
         hashes = [hashlib.md5(str(i).encode()).hexdigest()[:8] for i in samples.values]
         selection = [hash not in self.observed_hashes for hash in hashes]
         samples = samples[selection]
-        print("Deleted", np.sum(selection))
 
         # Clean samples and observed samples together
         frame = pd.concat([pd.DataFrame(self.observed_X), samples], sort=True)

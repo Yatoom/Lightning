@@ -21,9 +21,11 @@ ml.download_runs(6969)
 ml.convert_runs_to_features()
 grid = ml.suggest_grid()
 ml.download_meta_features()
-# ml.combine_features()
-# ml.train()
-# triple = ml.suggest_triple(mf=ml.meta_features.loc[31])
+grid["randomforestclassifier__max_features"] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+grid["randomforestclassifier__random_state"] = [42]
+ml.combine_features()
+ml.train()
+triple = ml.suggest_triple(mf=ml.meta_features.loc[31])
 # print(triple)
 nan = None
 triple = [
@@ -50,3 +52,7 @@ optimizer.setup(grid, X, y, cv=3)
 optimizer.seed(triple)
 suggestion = optimizer.loop()
 print()
+
+# 0.771982 {'randomforestclassifier__bootstrap': False, 'randomforestclassifier__criterion': 'entropy', 'randomforestclassifier__max_depth': nan, 'randomforestclassifier__max_features': 0.15978673840139168, 'randomforestclassifier__max_leaf_nodes': nan, 'randomforestclassifier__min_impurity_decrease': 1e-07, 'randomforestclassifier__min_samples_leaf': 3, 'randomforestclassifier__min_samples_split': 8, 'randomforestclassifier__min_weight_fraction_leaf': 0.0, 'randomforestclassifier__n_estimators': 100, 'randomforestclassifier__oob_score': False, 'conditionalimputer__axis': 0, 'conditionalimputer__copy': True, 'conditionalimputer__fill_empty': 0, 'conditionalimputer__strategy': 'mean', 'conditionalimputer__strategy_nominal': 'most_frequent', 'onehotencoder__handle_unknown': 'ignore', 'onehotencoder__categories': 'auto', 'variancethreshold__threshold': 0.0}
+# 0.772 {'randomforestclassifier__bootstrap': False, 'randomforestclassifier__criterion': 'entropy', 'randomforestclassifier__max_depth': nan, 'randomforestclassifier__max_features': 0.13858838975416954, 'randomforestclassifier__max_leaf_nodes': nan, 'randomforestclassifier__min_impurity_decrease': 1e-07, 'randomforestclassifier__min_samples_leaf': 3, 'randomforestclassifier__min_samples_split': 3, 'randomforestclassifier__min_weight_fraction_leaf': 0.0, 'randomforestclassifier__n_estimators': 100, 'randomforestclassifier__oob_score': False, 'conditionalimputer__axis': 0, 'conditionalimputer__copy': True, 'conditionalimputer__fill_empty': 0, 'conditionalimputer__strategy': 'median', 'conditionalimputer__strategy_nominal': 'most_frequent', 'onehotencoder__handle_unknown': 'ignore', 'onehotencoder__categories': 'auto', 'variancethreshold__threshold': 0.0}
+# 0.772992 {'randomforestclassifier__bootstrap': False, 'randomforestclassifier__criterion': 'gini', 'randomforestclassifier__max_depth': nan, 'randomforestclassifier__max_features': 0.2, 'randomforestclassifier__max_leaf_nodes': nan, 'randomforestclassifier__min_impurity_decrease': 1e-07, 'randomforestclassifier__min_samples_leaf': 4, 'randomforestclassifier__min_samples_split': 6, 'randomforestclassifier__min_weight_fraction_leaf': 0.0, 'randomforestclassifier__n_estimators': 100, 'randomforestclassifier__oob_score': False, 'conditionalimputer__axis': 0, 'conditionalimputer__copy': True, 'conditionalimputer__fill_empty': 0, 'conditionalimputer__strategy': 'mean', 'conditionalimputer__strategy_nominal': 'most_frequent', 'onehotencoder__handle_unknown': 'ignore', 'onehotencoder__categories': 'auto', 'variancethreshold__threshold': 0.0}
